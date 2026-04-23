@@ -5,20 +5,27 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import {
   BookOpen, Upload, Trash2, LogOut, Plus, X, FileText,
-  LayoutDashboard, Mail, ChevronDown, CheckCircle, AlertCircle
+  LayoutDashboard, Mail, ChevronDown, CheckCircle, AlertCircle,
+  Users, Image as ImageIcon
 } from 'lucide-react';
 
 export default function AdminDashboard() {
   const [user, setUser] = useState(null);
   const [resources, setResources] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [team, setTeam] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('resources');
   const [showUploadForm, setShowUploadForm] = useState(false);
+  const [showTeamForm, setShowTeamForm] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingTeam, setUploadingTeam] = useState(false);
   const [toast, setToast] = useState(null);
   const [newResource, setNewResource] = useState({
     title: '', type: 'Notes', year: 'Year 1', category: '', file: null
+  });
+  const [newTeamMember, setNewTeamMember] = useState({
+    name: '', role: '', file: null
   });
   const router = useRouter();
 
@@ -38,12 +45,14 @@ export default function AdminDashboard() {
 
   const fetchAll = async () => {
     setLoading(true);
-    const [res, msgs] = await Promise.all([
+    const [res, msgs, teamRes] = await Promise.all([
       supabase.from('resources').select('*').order('created_at', { ascending: false }),
       supabase.from('contact_messages').select('*').order('created_at', { ascending: false }),
+      supabase.from('team_members').select('*').order('display_order', { ascending: true }),
     ]);
     setResources(res.data || []);
     setMessages(msgs.data || []);
+    setTeam(teamRes.data || []);
     setLoading(false);
   };
 
@@ -115,6 +124,60 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleTeamUpload = async (e) => {
+    e.preventDefault();
+    if (!newTeamMember.name || !newTeamMember.role) {
+      showToast('Please fill in name and role.', 'error');
+      return;
+    }
+    setUploadingTeam(true);
+
+    let image_url = null;
+
+    if (newTeamMember.file) {
+      const fileExt = newTeamMember.file.name.split('.').pop();
+      const fileName = `team-${Date.now()}.${fileExt}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('resources')
+        .upload(fileName, newTeamMember.file);
+
+      if (uploadError) {
+        showToast('Image upload failed: ' + uploadError.message, 'error');
+        setUploadingTeam(false);
+        return;
+      }
+
+      const { data: urlData } = supabase.storage.from('resources').getPublicUrl(fileName);
+      image_url = urlData.publicUrl;
+    }
+
+    const { error } = await supabase.from('team_members').insert([{
+      name: newTeamMember.name,
+      role: newTeamMember.role,
+      image_url,
+      display_order: team.length
+    }]);
+
+    setUploadingTeam(false);
+    if (error) {
+      showToast('Failed to save team member: ' + error.message, 'error');
+    } else {
+      showToast('Team member added successfully!');
+      setShowTeamForm(false);
+      setNewTeamMember({ name: '', role: '', file: null });
+      fetchAll();
+    }
+  };
+
+  const handleTeamDelete = async (id) => {
+    if (!confirm('Are you sure you want to remove this team member?')) return;
+    const { error } = await supabase.from('team_members').delete().eq('id', id);
+    if (!error) {
+      showToast('Team member removed.');
+      setTeam((prev) => prev.filter((m) => m.id !== id));
+    }
+  };
+
   const markRead = async (id) => {
     await supabase.from('contact_messages').update({ is_read: true }).eq('id', id);
     setMessages((prev) => prev.map((m) => m.id === id ? { ...m, is_read: true } : m));
@@ -159,6 +222,12 @@ export default function AdminDashboard() {
             <BookOpen size={20} /> Resources
           </button>
           <button
+            className={`nav-item ${activeTab === 'team' ? 'active' : ''}`}
+            onClick={() => setActiveTab('team')}
+          >
+            <Users size={20} /> Team Members
+          </button>
+          <button
             className={`nav-item ${activeTab === 'messages' ? 'active' : ''}`}
             onClick={() => setActiveTab('messages')}
           >
@@ -184,17 +253,83 @@ export default function AdminDashboard() {
       <main className="admin-main">
         <div className="admin-topbar">
           <div>
-            <h1>{activeTab === 'resources' ? 'Resource Management' : 'Contact Messages'}</h1>
-            <p>{activeTab === 'resources' ? `${resources.length} total resources` : `${messages.length} messages`}</p>
+            <h1>
+              {activeTab === 'resources' ? 'Resource Management' : 
+               activeTab === 'team' ? 'Team Management' : 'Contact Messages'}
+            </h1>
+            <p>
+              {activeTab === 'resources' ? `${resources.length} total resources` : 
+               activeTab === 'team' ? `${team.length} total members` : `${messages.length} messages`}
+            </p>
           </div>
           {activeTab === 'resources' && (
             <button className="btn btn-primary add-btn" onClick={() => setShowUploadForm(true)}>
               <Plus size={18} /> Add Resource
             </button>
           )}
+          {activeTab === 'team' && (
+            <button className="btn btn-primary add-btn" onClick={() => setShowTeamForm(true)}>
+              <Plus size={18} /> Add Executive
+            </button>
+          )}
         </div>
 
-        {/* Upload Form Modal */}
+        {/* Team Member Modal */}
+        {showTeamForm && (
+          <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowTeamForm(false)}>
+            <div className="modal">
+              <div className="modal-header">
+                <h2>Add Executive Member</h2>
+                <button onClick={() => setShowTeamForm(false)}><X size={22} /></button>
+              </div>
+              <form onSubmit={handleTeamUpload} className="upload-form">
+                <div className="form-group">
+                  <label>Full Name *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Ibrahim Joseph Kamara"
+                    value={newTeamMember.name}
+                    onChange={(e) => setNewTeamMember({ ...newTeamMember, name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Role / Position *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. President"
+                    value={newTeamMember.role}
+                    onChange={(e) => setNewTeamMember({ ...newTeamMember, role: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Profile Image (Optional)</label>
+                  <div className="file-drop">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      id="image-upload"
+                      onChange={(e) => setNewTeamMember({ ...newTeamMember, file: e.target.files[0] })}
+                    />
+                    <label htmlFor="image-upload" className="file-label">
+                      <ImageIcon size={24} />
+                      <span>{newTeamMember.file ? newTeamMember.file.name : 'Click to select Image'}</span>
+                    </label>
+                  </div>
+                </div>
+                <div className="modal-actions">
+                  <button type="button" className="btn btn-outline" onClick={() => setShowTeamForm(false)}>Cancel</button>
+                  <button type="submit" className="btn btn-primary" disabled={uploadingTeam}>
+                    {uploadingTeam ? <span className="spinner" /> : <><Plus size={16} /> Add Member</>}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Resource Upload Modal */}
         {showUploadForm && (
           <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowUploadForm(false)}>
             <div className="modal">
@@ -312,6 +447,52 @@ export default function AdminDashboard() {
                             <Trash2 size={16} />
                           </button>
                         </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+
+        {/* Team Table */}
+        {activeTab === 'team' && (
+          <div className="table-wrap">
+            {team.length === 0 ? (
+              <div className="empty-state">
+                <Users size={48} />
+                <h3>No members yet</h3>
+                <p>Add your first executive member to show them on the home page.</p>
+              </div>
+            ) : (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Photo</th>
+                    <th>Name</th>
+                    <th>Role</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {team.map((m) => (
+                    <tr key={m.id}>
+                      <td>
+                        <div className="sender-avatar" style={{ 
+                          backgroundImage: m.image_url ? `url(${m.image_url})` : 'none',
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center'
+                        }}>
+                          {!m.image_url && m.name[0]}
+                        </div>
+                      </td>
+                      <td style={{ fontWeight: 600 }}>{m.name}</td>
+                      <td>{m.role}</td>
+                      <td>
+                        <button className="action-delete" onClick={() => handleTeamDelete(m.id)}>
+                          <Trash2 size={16} />
+                        </button>
                       </td>
                     </tr>
                   ))}

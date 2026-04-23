@@ -90,6 +90,29 @@ CREATE POLICY "Authenticated can read contacts"
 -- In Supabase Dashboard > Storage, create a bucket named: resources
 -- Set it to PUBLIC so download links work.
 
+-- STORAGE POLICIES (Run these if uploads fail)
+-- --------------------------------------------
+/*
+CREATE POLICY "Authenticated users can upload resources"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (bucket_id = 'resources');
+
+CREATE POLICY "Authenticated users can update resources"
+ON storage.objects FOR UPDATE
+TO authenticated
+USING (bucket_id = 'resources');
+
+CREATE POLICY "Authenticated users can delete resources"
+ON storage.objects FOR DELETE
+TO authenticated
+USING (bucket_id = 'resources');
+
+CREATE POLICY "Public access to resources"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'resources');
+*/
+
 -- ============================================
 -- Sample data (optional)
 -- ============================================
