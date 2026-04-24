@@ -92,7 +92,8 @@ CREATE POLICY "Authenticated can read contacts"
 
 -- STORAGE POLICIES (Run these if uploads fail)
 -- --------------------------------------------
-/*
+
+-- 1. Resources Bucket Policies
 CREATE POLICY "Authenticated users can upload resources"
 ON storage.objects FOR INSERT
 TO authenticated
@@ -111,7 +112,26 @@ USING (bucket_id = 'resources');
 CREATE POLICY "Public access to resources"
 ON storage.objects FOR SELECT
 USING (bucket_id = 'resources');
-*/
+
+-- 2. Team Bucket Policies
+CREATE POLICY "Authenticated users can upload team images"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (bucket_id = 'team');
+
+CREATE POLICY "Authenticated users can update team images"
+ON storage.objects FOR UPDATE
+TO authenticated
+USING (bucket_id = 'team');
+
+CREATE POLICY "Authenticated users can delete team images"
+ON storage.objects FOR DELETE
+TO authenticated
+USING (bucket_id = 'team');
+
+CREATE POLICY "Public access to team images"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'team');
 
 -- ============================================
 -- Sample data (optional)

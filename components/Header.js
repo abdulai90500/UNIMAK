@@ -29,7 +29,7 @@ const Header = () => {
     <header className={`header ${isScrolled ? 'scrolled' : ''}`}>
       <div className="container header-container">
         <Link href="/" className="logo">
-          <div className="logo-icon">PH</div>
+          <img src="/images/unimak (9).jpeg" alt="Unimak Public Health Logo" className="logo-img" />
           <span className="logo-text">Unimak Public Health</span>
         </Link>
 
@@ -112,16 +112,11 @@ const Header = () => {
           color: var(--primary);
         }
 
-        .logo-icon {
-          width: 40px;
+        .logo-img {
           height: 40px;
-          background: var(--primary);
-          color: white;
-          border-radius: 10px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 0.9rem;
+          width: auto;
+          border-radius: 8px;
+          object-fit: contain;
         }
 
         .desktop-nav {

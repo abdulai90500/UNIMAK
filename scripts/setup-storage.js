@@ -15,23 +15,34 @@ async function setupStorage() {
     process.exit(1);
   }
 
-  const exists = buckets.find(b => b.name === 'resources');
-  
-  if (exists) {
+  // 1. Resources bucket (PDFs)
+  const resExists = buckets.find(b => b.name === 'resources');
+  if (resExists) {
     console.log('Bucket "resources" already exists.');
   } else {
     console.log('Creating "resources" bucket...');
-    const { data, error } = await supabase.storage.createBucket('resources', {
+    const { error } = await supabase.storage.createBucket('resources', {
       public: true,
       allowedMimeTypes: ['application/pdf'],
       fileSizeLimit: 10485760 // 10MB
     });
-    
-    if (error) {
-      console.error('Error creating bucket:', error.message);
-    } else {
-      console.log('Bucket "resources" created successfully!');
-    }
+    if (error) console.error('Error creating "resources":', error.message);
+    else console.log('Bucket "resources" created successfully!');
+  }
+
+  // 2. Team bucket (Images)
+  const teamExists = buckets.find(b => b.name === 'team');
+  if (teamExists) {
+    console.log('Bucket "team" already exists.');
+  } else {
+    console.log('Creating "team" bucket...');
+    const { error } = await supabase.storage.createBucket('team', {
+      public: true,
+      allowedMimeTypes: ['image/*'],
+      fileSizeLimit: 5242880 // 5MB
+    });
+    if (error) console.error('Error creating "team":', error.message);
+    else console.log('Bucket "team" created successfully!');
   }
 }
 
